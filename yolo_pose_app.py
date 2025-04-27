@@ -8,7 +8,9 @@ import functools
 from datetime import datetime
 import threading
 import queue
+from get_kvs_hls import get_hls_stream_url
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 def time_it(func):
     """
@@ -34,6 +36,7 @@ def time_it(func):
 class YoloPoseApp:
     def __init__(self, model_path, clothes_path_top, clothes_path_bottom=None, camera_index=10, stream_size=(1080, 1920), stream_quality=60, stream_fps=30):
         self.model = YOLO(model_path)
+        self.model.fuse()
         self.stream = Stream("mjpeg", size=stream_size, quality=stream_quality, fps=stream_fps)
         self.server = MjpegServer("0.0.0.0", 5050)
         self.server.add_stream(self.stream)
@@ -56,9 +59,9 @@ class YoloPoseApp:
         self.read_thread = threading.Thread(target=self._read_worker, daemon=True)
         self.preprocess_thread = threading.Thread(target=self._preprocess_worker, daemon=True)
         self.infer_thread.start()
-        print(f"[YoloPoseApp] 模型載入中，等待 10s中...")
-        time.sleep(10)  # 等待模型初始化
-        print(f"[YoloPoseApp] 開始讀取攝影機...")
+        print("Yolo Inference thread starting, waiting for 10 seconds...")
+        time.sleep(10)
+
         self.display_thread.start()
         self.read_thread.start()
         self.preprocess_thread.start()
@@ -120,6 +123,9 @@ class YoloPoseApp:
             left_x, right_x = self._calc_upper_left_right_x(kp)
             left_x = max(0, left_x)
             right_x = min(1080, right_x)
+            if left_x >= right_x:
+                print(f"[警告] 上衣貼合異常，left_x >= right_x，left_x={left_x}, right_x={right_x}, kp={kp}")
+                return annotated_pil
             clothes_width = max(1, right_x - left_x)
             clothes_height = max(1, bottom_y - top_y)
             clothes_resized = self.clothes_img_top.resize((clothes_width, clothes_height))
@@ -170,8 +176,11 @@ class YoloPoseApp:
         return kp.shape[0] > 14 and all(np.any(kp[i] != 0) for i in [11, 12, 13, 14])
 
     def _calc_upper_top_y(self, kp):
-        # 上邊界：左右肩膀中點
-        return int((kp[5][1] + kp[6][1]) / 2)
+        # 上邊界：如果有鼻子，取鼻子與左右肩膀三點的 y 平均，否則取左右肩膀中點
+        if kp.shape[0] > 6 and np.any(kp[0] != 0):
+            return int((kp[0][1] + kp[5][1] + kp[6][1]) / 3)
+        else:
+            return int((kp[5][1] + kp[6][1]) / 2)
 
     def _calc_upper_bottom_y(self, kp):
         # 下邊界：左右臀部中點
@@ -179,8 +188,11 @@ class YoloPoseApp:
 
     def _calc_upper_left_right_x(self, kp):
         # 左右邊界：肩膀與手肘的中間點
-        left_x = int((kp[5][0] + kp[7][0]) / 2) if np.any(kp[7] != 0) else int(kp[5][0])
-        right_x = int((kp[6][0] + kp[8][0]) / 2) if np.any(kp[8] != 0) else int(kp[6][0])
+        left_x = int((kp[5][0] + kp[7][0]*2) / 3) if np.any(kp[7] != 0) else int(kp[5][0])
+        right_x = int((kp[6][0] + kp[8][0]*2) / 3) if np.any(kp[8] != 0) else int(kp[6][0])
+        # 確保 left_x < right_x
+        if left_x > right_x:
+            left_x, right_x = right_x, left_x
         return left_x, right_x
 
     def _calc_lower_top_y(self, kp):
@@ -312,7 +324,9 @@ def create_yolo_app(clothes_path_top=None, clothes_path_bottom=None):
         model_path=os.path.expanduser("/home/icam-540/yolo_mirror/yolo11m-pose.pt"),
         clothes_path_top=clothes_path_top,
         clothes_path_bottom=clothes_path_bottom,
-        camera_index='/home/icam-540/fast_mirror/pic/people_demo.mp4',
+        # camera_index='/home/icam-540/fast_mirror/pic/people_demo.mp4',
+        # camera_index=10,
+        camera_index=get_hls_stream_url(),
         stream_size=(1080, 1920),
         stream_quality=75,
         stream_fps=30
@@ -320,6 +334,7 @@ def create_yolo_app(clothes_path_top=None, clothes_path_bottom=None):
 
 app_instance = None
 flask_app = Flask(__name__)
+CORS(flask_app)
 
 @flask_app.route('/set_clothes_path', methods=['POST'])
 def set_clothes_path_api():

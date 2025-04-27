@@ -48,6 +48,8 @@ app.run()
 
 ## HTTP API 說明
 
+API 端點: `http://<server-ip>:8080`
+
 ### 更換衣服圖檔
 
 - 路徑：`POST /set_clothes_path`
