@@ -64,16 +64,35 @@ class YoloPoseApp:
 
     def set_clothes_path(self, clothes_path, part="top"):
         """
-        動態更換衣服圖檔
+        動態更換衣服圖檔，支援本地路徑、HTTP/HTTPS 網路圖片、AWS S3 路徑。
         part: "top" 或 "bottom"
         """
-        img = Image.open(clothes_path).convert("RGBA")
+        from io import BytesIO
+        img = None
+        if clothes_path.startswith("http://") or clothes_path.startswith("https://"):
+            # 網路圖片
+            import requests
+            resp = requests.get(clothes_path)
+            resp.raise_for_status()
+            img = Image.open(BytesIO(resp.content)).convert("RGBA")
+            print(f"[YoloPoseApp] 已從網路載入衣服圖：{clothes_path}")
+        elif clothes_path.startswith("s3://"):
+            # S3 圖片
+            import boto3
+            s3 = boto3.client('s3')
+            bucket_key = clothes_path[5:]
+            bucket, key = bucket_key.split('/', 1)
+            obj = s3.get_object(Bucket=bucket, Key=key)
+            img = Image.open(BytesIO(obj['Body'].read())).convert("RGBA")
+            print(f"[YoloPoseApp] 已從 S3 載入衣服圖：{clothes_path}")
+        else:
+            # 本地檔案
+            img = Image.open(clothes_path).convert("RGBA")
+            print(f"[YoloPoseApp] 已從本地載入衣服圖：{clothes_path}")
         if part == "top":
             self.clothes_img_top = img
-            print(f"[YoloPoseApp] 已更換上衣圖：{clothes_path}")
         elif part == "bottom":
             self.clothes_img_bottom = img
-            print(f"[YoloPoseApp] 已更換下身圖：{clothes_path}")
         else:
             print(f"[YoloPoseApp] part 參數錯誤，必須為 'top' 或 'bottom'")
 
