@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook
+*.ipynb
+
+# Model weights
+*.pt
+*.pth
+*.h5
+
+# Images and outputs
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.tiff
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# VSCode
+.vscode/
+
+# Env
+.env
+
+# Others
+output_cropped.jpg
+original.jpg
