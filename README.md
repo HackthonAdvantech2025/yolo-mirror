@@ -46,6 +46,41 @@ app.run()
 
 瀏覽器開啟 `http://<server-ip>:5050` 觀看即時串流。
 
+## HTTP API 說明
+
+### 更換衣服圖檔
+
+- 路徑：`POST /set_clothes_path`
+- 說明：動態更換上衣或下身服裝圖檔，支援本地路徑、HTTP/HTTPS 網路圖片、AWS S3 路徑。
+- 請求格式（JSON）：
+
+```json
+{
+  "clothes_path": "圖片路徑（本地、http、s3）",
+  "part": "top" 或 "bottom" // 選填，預設 top
+}
+```
+
+- 回應格式：
+  - 成功：`{"status": "success"}`
+  - 失敗：`{"error": "訊息"}`
+
+#### 範例
+
+```bash
+curl -X POST http://localhost:8080/set_clothes_path \
+  -H "Content-Type: application/json" \
+  -d '{"clothes_path": "https://example.com/tshirt.png", "part": "top"}'
+```
+
+或
+
+```bash
+curl -X POST http://localhost:8080/set_clothes_path \
+  -H "Content-Type: application/json" \
+  -d '{"clothes_path": "s3://your-bucket/path/to/pants.png", "part": "bottom"}'
+```
+
 ## 目錄結構說明
 
 ```

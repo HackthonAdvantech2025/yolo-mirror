@@ -8,6 +8,7 @@ import functools
 from datetime import datetime
 import threading
 import queue
+from flask import Flask, request, jsonify
 
 def time_it(func):
     """
@@ -317,10 +318,37 @@ def create_yolo_app(clothes_path_top=None, clothes_path_bottom=None):
         stream_fps=30
     )
 
+app_instance = None
+flask_app = Flask(__name__)
+
+@flask_app.route('/set_clothes_path', methods=['POST'])
+def set_clothes_path_api():
+    """
+    HTTP API: 更換衣服圖檔
+    請求格式：
+    {
+        "clothes_path": "圖片路徑（本地、http、s3）",
+        "part": "top" 或 "bottom"
+    }
+    """
+    global app_instance
+    data = request.get_json()
+    clothes_path = data.get('clothes_path')
+    part = data.get('part', 'top')
+    if not clothes_path:
+        return jsonify({"error": "clothes_path 必填"}), 400
+    try:
+        app_instance.set_clothes_path(clothes_path, part)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
-    # 建立主應用物件，指定模型、衣服圖、攝影機等參數
-    app = create_yolo_app(
+    app_instance = create_yolo_app(
         clothes_path_top="/home/icam-540/yolo_mirror/tshirt1.png",
         clothes_path_bottom="/home/icam-540/yolo_mirror/pants1.png"
     )
-    app.run()
+    import threading
+    t = threading.Thread(target=app_instance.run, daemon=True)
+    t.start()
+    flask_app.run(host="0.0.0.0", port=8080)
